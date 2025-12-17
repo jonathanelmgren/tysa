@@ -9,21 +9,24 @@ import sys
 import time
 import logging
 import subprocess
-from typing import Optional, Tuple
-from datetime import datetime
+import re
+import json
+from typing import Optional, Tuple, Dict
 
 from openai import OpenAI
-from elevenlabs import ElevenLabs, VoiceSettings
+from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 
-# Configure logging
+load_dotenv()
+
+handlers = [logging.FileHandler('tysa.log')]
+if os.getenv('DEBUG', 'false').lower() == 'true':
+    handlers.append(logging.StreamHandler(sys.stdout))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('tysa.log')
-    ]
+    handlers=handlers
 )
 logger = logging.getLogger(__name__)
 
@@ -34,42 +37,76 @@ class SpotifyAnnouncer:
     def __init__(self):
         """Initialize the announcer with API clients"""
         load_dotenv()
-
-        # Validate environment variables
         self._validate_env_vars()
 
-        # Initialize OpenAI client
-        self.openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-
-        # Initialize ElevenLabs client
-        self.elevenlabs_client = ElevenLabs(api_key=os.getenv('ELEVENLABS_API_KEY'))
-
-        # Configuration
-        self.voice_id = os.getenv('ELEVENLABS_VOICE_ID', 'EXAVITQu4vr4xnSDxMaL')  # Default: Sarah
+        self.enable_gpt = os.getenv('ENABLE_GPT_SIMPLIFICATION', 'true').lower() == 'true'
+        self.voice_id = os.getenv('ELEVENLABS_VOICE_ID', 'cjVigY5qzO86Huf0OWal')
         self.model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
         self.output_dir = os.getenv('OUTPUT_DIR', 'output')
-        self.poll_interval = int(os.getenv('POLL_INTERVAL_SECONDS', '5'))
+        self.poll_interval = int(os.getenv('POLL_INTERVAL_SECONDS', '1'))
+        self.gpt_cache_file = os.getenv('GPT_CACHE_FILE', '.gpt_cache.json')
+        self.volume = float(os.getenv('PLAYBACK_VOLUME', '0.5'))
 
-        # Create output directory
+        self.openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY')) if self.enable_gpt else None
+        self.elevenlabs_client = ElevenLabs(api_key=os.getenv('ELEVENLABS_API_KEY'))
+
         os.makedirs(self.output_dir, exist_ok=True)
 
-        # Track the last processed song (song + artist combo)
         self.last_track = None
+        self.gpt_cache: Dict[str, Dict[str, str]] = self._load_gpt_cache()
 
         logger.info("TYSA initialized successfully")
 
+    def _load_gpt_cache(self) -> Dict[str, Dict[str, str]]:
+        """
+        Load GPT simplification cache from JSON file
+
+        Returns:
+            Dictionary mapping raw track info to simplified versions
+        """
+        if not os.path.exists(self.gpt_cache_file):
+            logger.info("No GPT cache file found, starting with empty cache")
+            return {}
+
+        try:
+            with open(self.gpt_cache_file, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+            logger.info(f"Loaded GPT cache with {len(cache)} entries")
+            return cache
+        except Exception as e:
+            logger.error(f"Failed to load GPT cache: {e}")
+            return {}
+
+    def _save_gpt_cache(self):
+        """Save GPT simplification cache to JSON file"""
+        try:
+            with open(self.gpt_cache_file, 'w', encoding='utf-8') as f:
+                json.dump(self.gpt_cache, f, indent=2, ensure_ascii=False)
+            logger.debug(f"Saved GPT cache with {len(self.gpt_cache)} entries")
+        except Exception as e:
+            logger.error(f"Failed to save GPT cache: {e}")
+
     def _validate_env_vars(self):
         """Validate required environment variables"""
-        required_vars = [
-            'OPENAI_API_KEY',
-            'ELEVENLABS_API_KEY'
-        ]
+        required_vars = ['ELEVENLABS_API_KEY']
+
+        enable_gpt = os.getenv('ENABLE_GPT_SIMPLIFICATION', 'true').lower() == 'true'
+        if enable_gpt:
+            required_vars.append('OPENAI_API_KEY')
 
         missing_vars = [var for var in required_vars if not os.getenv(var)]
 
         if missing_vars:
             logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
             raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+    def _sanitize_filename(self, text: str) -> str:
+        """Sanitize text for use in filenames by removing special characters and normalizing whitespace"""
+        sanitized = re.sub(r'[^\w\s-]', '', text)
+        sanitized = re.sub(r'[\s]+', '_', sanitized)
+        sanitized = re.sub(r'_+', '_', sanitized)
+        sanitized = sanitized.strip('_')
+        return sanitized
 
     def get_current_track(self) -> Optional[Tuple[str, str]]:
         """
@@ -100,7 +137,6 @@ class SpotifyAnnouncer:
                 output = result.stdout.strip()
                 if '|' in output:
                     song, artist = output.split('|', 1)
-                    logger.info(f"Current track: {song.strip()} by {artist.strip()}")
                     return song.strip(), artist.strip()
 
         except subprocess.TimeoutExpired:
@@ -113,6 +149,8 @@ class SpotifyAnnouncer:
     def simplify_title_with_gpt(self, song: str, artist: str) -> Tuple[str, str]:
         """
         Use GPT to simplify song titles for spoken announcements
+        Uses cache to avoid redundant API calls
+        If GPT is disabled, returns the original song and artist
 
         Args:
             song: Original song title
@@ -121,6 +159,16 @@ class SpotifyAnnouncer:
         Returns:
             Tuple of (simplified_song, simplified_artist)
         """
+        if not self.enable_gpt or not self.openai_client:
+            logger.debug("GPT simplification disabled, using original title")
+            return song, artist
+
+        cache_key = f"{song}|{artist}"
+        if cache_key in self.gpt_cache:
+            cached = self.gpt_cache[cache_key]
+            logger.info(f"Using cached GPT simplification: {song} by {artist} → {cached['song']} by {cached['artist']}")
+            return cached['song'], cached['artist']
+
         system_prompt = """You simplify song titles for a spoken radio announcement.
 
 Remove ALL of the following:
@@ -163,13 +211,44 @@ No quotes, no extra text, no explanations."""
 
             if " by " in result:
                 simplified_song, simplified_artist = result.rsplit(" by ", 1)
-                return simplified_song.strip(), simplified_artist.strip()
+                simplified_song = simplified_song.strip()
+                simplified_artist = simplified_artist.strip()
+            else:
+                simplified_song = result
+                simplified_artist = artist
 
-            return result, artist
+            self.gpt_cache[cache_key] = {
+                'song': simplified_song,
+                'artist': simplified_artist
+            }
+            self._save_gpt_cache()
+
+            return simplified_song, simplified_artist
 
         except Exception as e:
             logger.error(f"GPT simplification failed: {e}")
             return song, artist
+
+    def _play_audio(self, file_path: str) -> bool:
+        """Play audio file using macOS afplay command"""
+        try:
+            subprocess.run(
+                ['afplay', '-v', str(self.volume), file_path],
+                check=True,
+                capture_output=True,
+                timeout=30
+            )
+            logger.info(f"Played audio: {os.path.basename(file_path)}")
+            return True
+        except subprocess.TimeoutExpired:
+            logger.error(f"Audio playback timed out: {file_path}")
+            return False
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to play audio: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error playing audio: {e}")
+            return False
 
     def generate_speech(self, text: str, output_filename: str) -> Optional[str]:
         """
@@ -185,24 +264,22 @@ No quotes, no extra text, no explanations."""
         try:
             logger.info(f"Generating speech: '{text}'")
 
-            # Generate audio
             audio = self.elevenlabs_client.text_to_speech.convert(
-                voice_id=self.voice_id,
                 text=text,
+                voice_id=self.voice_id,
                 model_id="eleven_multilingual_v2",
-                voice_settings=VoiceSettings(
-                    stability=0.5,
-                    similarity_boost=0.75,
-                    style=0.0,
-                    use_speaker_boost=True
-                )
+                output_format="mp3_44100_128"
             )
 
-            # Save audio to file
+            audio_data = b''.join(chunk for chunk in audio)
+
+            if not audio_data:
+                logger.error("Received empty audio data from ElevenLabs")
+                return None
+
             output_path = os.path.join(self.output_dir, output_filename)
             with open(output_path, 'wb') as f:
-                for chunk in audio:
-                    f.write(chunk)
+                f.write(audio_data)
 
             logger.info(f"Audio saved to {output_path}")
             return output_path
@@ -218,41 +295,38 @@ No quotes, no extra text, no explanations."""
         Returns:
             True if a track was processed, False otherwise
         """
-        # Get current track
         track_info = self.get_current_track()
-
         if not track_info:
             return False
 
         song, artist = track_info
-
-        # Create a unique identifier for this track
         track_identifier = f"{song}|{artist}"
 
-        # Skip if we've already processed this track
         if track_identifier == self.last_track:
             logger.debug(f"Track already processed: {song} by {artist}")
             return False
 
-        # Update last track
         self.last_track = track_identifier
 
-        # Simplify title and artist
         simplified_song, simplified_artist = self.simplify_title_with_gpt(song, artist)
-
-        # Create announcement text
-        announcement = f"Now playing: {simplified_song} by {simplified_artist}"
+        announcement = f"Now playing: {simplified_song} - by {simplified_artist}"
         logger.info(f"Announcement: {announcement}")
 
-        # Generate filename
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"announcement_{timestamp}.mp3"
+        safe_artist = self._sanitize_filename(simplified_artist)
+        safe_title = self._sanitize_filename(simplified_song)
+        filename = f"{safe_artist}_{safe_title}.mp3"
+        file_path = os.path.join(self.output_dir, filename)
 
-        # Generate speech
+        if os.path.exists(file_path):
+            logger.info(f"Audio file already exists: {filename} (skipping ElevenLabs)")
+            self._play_audio(file_path)
+            return True
+
         audio_path = self.generate_speech(announcement, filename)
 
         if audio_path:
             logger.info(f"Successfully processed track: {simplified_song} by {simplified_artist}")
+            self._play_audio(audio_path)
             return True
 
         return False
@@ -288,8 +362,6 @@ def main():
     """Main entry point"""
     try:
         announcer = SpotifyAnnouncer()
-
-        # Check if we should run continuously or once
         mode = os.getenv('RUN_MODE', 'continuous').lower()
 
         if mode == 'once':

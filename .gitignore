@@ -1,0 +1,25 @@
+# Environment
+.env
+venv/
+.spotify_cache
+.gpt_cache.json
+
+# Output
+output/
+*.mp3
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

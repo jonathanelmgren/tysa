@@ -1,135 +1,196 @@
-# TYSA - The Yapping Spotify Announcer
+# 🎤 TYSA: The Yapping Spotify Announcer
 
-A production-grade Python script that monitors your Spotify playback, simplifies track titles using GPT, and generates spoken announcements with ElevenLabs text-to-speech.
+![TYSA Logo](tysa.jpg)
 
-## Features
+TYSA is your digital radio DJ. A Python script that detects your current Spotify track and announces it with smooth, AI-generated commentary. It's like having a late-night FM host living in your terminal.
 
-- Automatically detects currently playing Spotify tracks (macOS only via AppleScript)
-- Uses GPT to simplify complex song titles (removes opus numbers, movement markings, etc.)
-- Generates natural-sounding speech announcements with ElevenLabs
-- Continuous monitoring mode with configurable polling intervals
-- Comprehensive logging and error handling
-- Environment variable configuration
+Yes, I know this completely outs me as someone who listens to classical music. And yes, that's exactly why GPT simplification exists - because nobody wants to hear "Symphony No. 9 in D Minor, Op. 125 'Choral': IV. Presto - Allegro assai" when you can just say "Ode to Joy." 🎻
 
-## Requirements
+## ✨ What's in The Booth
 
-- macOS (uses AppleScript to communicate with Spotify)
-- Python 3.8+
-- Spotify desktop app
-- OpenAI API key
-- ElevenLabs API key
+**Smart Yapping:** Simplifies complex classical titles using GPT-4o-mini so your announcements sound natural instead of reading a library catalog.
 
-## Installation
+**Radio Voice:** Uses ElevenLabs TTS with the "Eric" voice for that broadcast feel. Set the volume anywhere from 0.0 (silent) to 1.0 (max).
 
-1. Clone or download this repository
+**Caching:** Never pays twice. Caches both GPT responses and audio files so replaying a track costs exactly $0.
 
-2. Install Python dependencies:
+**Instant Detection:** Polls every second to catch track changes fast. No more dead air between songs.
+
+**macOS Native:** Uses AppleScript, which means no OAuth nightmares with Spotify's Web API. It just works.
+
+**Silent Mode:** Logs to file only unless you set DEBUG=true. Keep the booth clean.
+
+## 🚀 Quick Start (Spinning Up)
+
+### Installation
+
+Clone the repo and copy the env file:
+
 ```bash
-pip install -r requirements.txt
-```
-
-3. Copy the example environment file:
-```bash
+git clone <your-repo-url>
+cd tysa
 cp .env.example .env
 ```
 
-4. Edit `.env` and add your API keys:
-```bash
-# Get OpenAI API key from: https://platform.openai.com/api-keys
-OPENAI_API_KEY=your_openai_api_key_here
+Add your API keys to `.env`:
+- ElevenLabs API key (required): https://elevenlabs.io/
+- OpenAI API key (optional): https://platform.openai.com/api-keys
 
-# Get ElevenLabs API key from: https://elevenlabs.io/
-ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
-
-# Optional: Choose a different voice from https://elevenlabs.io/voice-library
-ELEVENLABS_VOICE_ID=EXAVITQu4vr4xnSDxMaL
-```
-
-## Usage
-
-### Continuous Mode (Default)
-
-Run the script to continuously monitor Spotify and announce new tracks:
+### Run It
 
 ```bash
-python tysa.py
+./run.sh
 ```
 
-The script will:
-- Poll Spotify every 5 seconds (configurable)
-- Detect when a new track starts playing
-- Generate and save an announcement audio file
-- Continue running until you press Ctrl+C
+That's it! TYSA will set up a virtual environment on first run, install dependencies automatically, and start yapping whenever you change tracks.
+
+**To stop:** Press `Ctrl+C` or kill the process with `pkill -f tysa.py` (or run in background with something like pm2, tmux or screen).
+
+## ⚙️ Configuration (Tuning The Booth)
+
+All settings live in your `.env` file:
+
+| Variable | Default | What It Does |
+|----------|---------|--------------|
+| `ELEVENLABS_API_KEY` | *required* | Your ElevenLabs API key |
+| `ELEVENLABS_VOICE_ID` | `cjVigY5qzO86Huf0OWal` | Voice ID (default: Eric) |
+| `OPENAI_API_KEY` | *optional* | Only needed if GPT simplification is on |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Model for title simplification |
+| `PLAYBACK_VOLUME` | `0.5` | Volume (0.0=silent, 1.0=max) |
+| `POLL_INTERVAL_SECONDS` | `1` | How often to check for track changes |
+| `ENABLE_GPT_SIMPLIFICATION` | `true` | Simplify classical titles? |
+| `DEBUG` | `false` | Log to terminal (true) or file only (false) |
+| `OUTPUT_DIR` | `output` | Where to save generated MP3s |
+| `RUN_MODE` | `continuous` | `continuous` or `once` |
+
+### Example: Quiet Mode
+```bash
+PLAYBACK_VOLUME=0.3 ./run.sh
+```
+
+### Example: Yell Mode
+```bash
+PLAYBACK_VOLUME=1.0 ./run.sh
+```
+
+## 🎙️ How The Yapping Works
+
+**Step 1:** AppleScript checks Spotify every second for track changes.
+
+**Step 2:** If GPT simplification is enabled, it strips out opus numbers, movements, and key signatures.
+
+**Step 3:** ElevenLabs generates a natural announcement with the Eric voice.
+
+**Step 4:** TYSA plays the audio using macOS's `afplay` command.
+
+**Step 5:** Both the GPT result and audio file are saved for next time.
+
+### What You'll Hear
+
+Instead of this nightmare:
+> "Symphony No. 9 in D Minor, Op. 125 'Choral': IV. Presto - Allegro assai by Ludwig van Beethoven"
+
+You get this:
+> **"Now playing: Ode to Joy - by Beethoven"** 🎵
+
+## 📂 Output & Caching
+
+Generated announcements are saved to `output/` with clean filenames:
+
+```
+output/
+├── Beethoven_Moonlight_Sonata.mp3
+├── Offenbach_Cancan.mp3
+└── Mussorgsky_Night_on_Bald_Mountain.mp3
+```
+
+### The Caching System
+
+**GPT Cache** (`.gpt_cache.json`) stores simplified titles so you never call ChatGPT twice for the same track.
+
+**Audio Cache** (`output/` directory) reuses MP3 files so you never call ElevenLabs twice for the same announcement.
+
+**Translation:** Once a track is announced, it's cached forever. Replays cost $0. 💰
+
+## 🎚️ Advanced Usage
 
 ### Single-Shot Mode
 
-Process only the currently playing track and exit:
+Announce the current track once and exit:
+```bash
+RUN_MODE=once ./run.sh
+```
+
+### Manual Python Usage
+
+If you want full control:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python tysa.py
+```
+
+### Kill All TYSA Processes
 
 ```bash
-RUN_MODE=once python tysa.py
+pkill -f tysa.py
 ```
 
-## Configuration
-
-All configuration is done via the `.env` file:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENAI_API_KEY` | *required* | Your OpenAI API key |
-| `ELEVENLABS_API_KEY` | *required* | Your ElevenLabs API key |
-| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI model for title simplification |
-| `ELEVENLABS_VOICE_ID` | `EXAVITQu4vr4xnSDxMaL` | ElevenLabs voice ID (Sarah) |
-| `OUTPUT_DIR` | `output` | Directory for generated audio files |
-| `POLL_INTERVAL_SECONDS` | `5` | How often to check for track changes |
-| `RUN_MODE` | `continuous` | Run mode: `continuous` or `once` |
-
-## Output
-
-Generated announcements are saved to the `output/` directory with filenames like:
-```
-announcement_20231215_143022.mp3
-```
-
-Each file contains a spoken announcement like:
-> "Now playing: Moonlight Sonata by Beethoven"
-
-## Logging
-
-Logs are written to both:
-- Console (stdout)
-- `tysa.log` file
-
-Log levels can be adjusted in the script if needed.
-
-## Title Simplification
-
-The GPT integration automatically simplifies complex classical music titles by removing:
-- Opus numbers (Op. 71, Op.posth)
-- Movement numbers (I., II., III.)
-- Tempo markings (Allegro, Andante, etc.)
-- Catalog numbers (BWV 565, K. 331, etc.)
-- Key signatures (in E Major, etc.)
-- Remaster notes and version info
-
-Composer names are also shortened (e.g., "Pyotr Ilyich Tchaikovsky" → "Tchaikovsky")
-
-## Troubleshooting
+## 🐛 Troubleshooting (Dead Air Prevention)
 
 ### "Nothing is currently playing"
-- Make sure Spotify desktop app is running
-- Make sure a track is actually playing (not paused)
+Make sure Spotify is running and a track is playing (not paused).
 
 ### "Missing required environment variables"
-- Check that your `.env` file exists
-- Verify both `OPENAI_API_KEY` and `ELEVENLABS_API_KEY` are set
+Check that your `.env` file exists. `ELEVENLABS_API_KEY` is always required. `OPENAI_API_KEY` is only needed if `ENABLE_GPT_SIMPLIFICATION=true`.
 
 ### Permission errors with AppleScript
-- Grant Terminal/your terminal app permission to control Spotify in System Preferences → Privacy & Security → Automation
+Go to **System Preferences → Privacy & Security → Automation** and grant your terminal app permission to control Spotify.
 
-## License
+### Volume is too loud/quiet
+Adjust `PLAYBACK_VOLUME` in `.env` (range: 0.0 to 1.0). Default is 0.5 (50%).
+
+## 🎵 Title Simplification (The Classical Problem)
+
+When enabled, GPT strips out all the unnecessary metadata from classical music titles.
+
+**What gets removed:** Opus numbers (Op. 71, Op.posth), movement numbers (I., II., III.), tempo markings (Allegro, Andante, Presto), catalog numbers (BWV 565, K. 331, D. 960), key signatures (in E Major, in D Minor), and remaster notes (2023 Remaster, Radio Edit).
+
+**What stays:** The main piece name and recognizable subtitles like "Ode to Joy."
+
+**Composer shortening:** Pyotr Ilyich Tchaikovsky becomes Tchaikovsky. Ludwig van Beethoven becomes Beethoven. Wolfgang Amadeus Mozart becomes Mozart.
+
+**To disable:** Set `ENABLE_GPT_SIMPLIFICATION=false` in `.env`
+
+## 📜 The TYSA Dictionary
+
+**Yap (v.):** To announce a song. *"TYSA starts yapping when the track changes."*
+
+**The Booth:** The terminal where the script is running.
+
+**Spinning:** Playing a track.
+
+**Dead Air:** When the script crashes (we avoid this).
+
+**Silence:** The enemy.
+
+## 📦 Requirements
+
+You'll need **macOS** (uses AppleScript, sorry Windows/Linux folks), **Python 3.8+**, **Spotify Desktop App** (must be running), **ElevenLabs API Key** (required), and **OpenAI API Key** (optional, for title simplification).
+
+## 📝 License
 
 MIT
 
-## Notes
+## 💡 Notes
 
-This is a personal project designed for macOS. The AppleScript integration means it won't work on Windows or Linux, but it's much simpler than using Spotify's Web API!
+This is a personal project vibe coded for macOS with Claude Code. The AppleScript approach means no OAuth nightmares with Spotify's Web API—it just works.
+
+**Made with ❤️ and way too much classical music.**
+
+## 🎧 Pro Tips
+
+Set `POLL_INTERVAL_SECONDS=1` for instant announcements. Use `DEBUG=true` if you want to see logs in the terminal. Lower `PLAYBACK_VOLUME` if TYSA is too hype. Disable GPT simplification if you actually like reading opus numbers.
+
+**Keep it locked. TYSA out.** 📻
