@@ -214,14 +214,13 @@ If MODE is SMART:
 
 If MODE is WIZARD:
 - Uses eleven_v3 which supports brackets
-- Start with DJ instruction: "[You are an upbeat radio DJ briefly announcing songs with the artist name before they play] "
 - Translate "Now playing" and "by" to the BASE LANGUAGE
 - Use [read in XX] brackets for song/artist in their native language
 - Use [read in BASE] to switch back to base language between song and artist
-- IMPORTANT: Add " - " before AND after "by"
-- Format: "[DJ instruction] [translated 'Now playing']: [read in XX][song] [read in BASE] - [translated 'by'] - [read in XX][artist]"
-- Example (BASE=sv, song in English): "[You are an upbeat radio DJ briefly announcing songs with the artist name before they play] Nu spelas: [read in en]Gaia [read in sv] - av - [read in en]Oliver Ólafsson"
-- Example (BASE=en, song in Swedish): "[You are an upbeat radio DJ briefly announcing songs with the artist name before they play] Now playing: [read in sv]Alla vill ju vara som du [read in en] - by - [read in sv]Nanne Grönvall"
+- Add " - " before AND after "by"
+- Format: "[translated 'Now playing']: [read in XX][song] [read in BASE] - [translated 'by'] - [read in XX][artist]"
+- Example (BASE=sv, song in English): "Nu spelas: [read in en]Gaia [read in sv] - av - [read in en]Oliver Ólafsson"
+- Example (BASE=en, song in Swedish): "Now playing: [read in sv]Alla vill ju vara som du [read in en] - by - [read in sv]Nanne Grönvall"
 
 Respond with ONLY the announcement string. No explanations."""
 

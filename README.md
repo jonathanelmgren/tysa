@@ -22,6 +22,46 @@ So I figured, what if I learned unconsciously? If someone announced the song and
 - Localized broadcasts: seamlessly switch between languages mid-announcement
 - Caches everything - replays cost $0
 
+## Cost Estimate
+
+**Characters per song:**
+- Basic/Smart: ~45 chars (no brackets)
+- Wizard: ~90 chars (with language switching brackets)
+
+**ElevenLabs free tier (monthly):**
+- Flash (basic/smart): 20,000 chars = **~444 unique songs**
+- v3 (wizard): 10,000 chars = **~110 unique songs**
+
+**Paid tier ($5/month):**
+- Flash: 60,000 chars = 1,333 songs
+- v3: 30,000 chars = 333 songs
+
+**Cost per unique song (after free tier):**
+- **Basic**: ~$0.004 (ElevenLabs flash only)
+- **Smart**: ~$0.0041 (flash + GPT ~$0.0001)
+- **Wizard**: ~$0.015 (v3 + GPT) - **3.5x more** due to brackets
+
+**Replays: $0** - Everything is cached!
+
+For 1,000 unique songs in smart mode: ~$4 total. After that, your entire library is cached forever.
+
+### How Long Can I Listen?
+
+**10 hours/day = ~171 songs** (assuming 3.5 min/song)
+
+**Variety listener (all new songs):**
+- Free tier basic/smart: **2.6 days**
+- Free tier wizard: **14 hours**
+- Paid ($5/month) basic/smart: **7.8 days**
+- Paid ($5/month) wizard: **1.9 days**
+
+**Playlist listener (500-song library):**
+- First pass: Uses free tier + some paid
+- **Every replay after: FREE FOREVER** ✨
+- Listen 10 hours/day, every day, indefinitely at $0
+
+The cache makes this incredibly cost-effective for regular listening habits!
+
 ## Setup
 
 ```bash
@@ -77,7 +117,7 @@ Stop with `Ctrl+C` or `pkill -f tysa.py`
 - GPT + multilingual inline switching
 - Uses `eleven_v3` with brackets
 - Songs pronounced in native language
-- Example (LANGUAGE_CODE=sv): "Nu spelas: [English]Gaia [Swedish] - av - [English]Oliver Ólafsson"
+- Example (LANGUAGE_CODE=sv): "Nu spelas: [read in en]Gaia [read in sv] - av - [read in en]Oliver Ólafsson"
 
 ## How It Works
 
