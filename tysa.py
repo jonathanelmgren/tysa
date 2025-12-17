@@ -171,26 +171,23 @@ class SpotifyAnnouncer:
 
         system_prompt = """You simplify song titles for a spoken radio announcement.
 
-Remove ALL of the following:
-- Opus numbers (Op. 71, Op.posth)
-- Movement numbers (I., II., III., IV., No. 13)
-- Act numbers (Act 2, Act II)
-- Tempo markings (Allegro, Andante, Moderato, Presto, Adagio, Largo, Vivace, etc.)
-- Catalog numbers (BWV 565, K. 331, D. 960, Hob., RV, etc.)
-- Key signatures (in E Major, in D Minor, in B-flat Major, E-Dur, etc.)
-- Scene descriptions (Scène, Danse des cygnes, etc.)
-- Remaster notes (Remastered, 2023 Remaster, etc.)
-- Version notes (Radio Edit, Extended Version, etc.)
+For NORMAL SONGS (pop, rock, jazz, etc.):
+- Keep the FULL title exactly as is, including all words
+- Examples: "Prepare for Landing" stays "Prepare for Landing", "Resounding Hymn" stays "Resounding Hymn"
+- "En whoppsi-doppsi, lopp-di-loppsi, alli-hoppsi-studs" stays fully intact
+- ONLY remove metadata: "from [movie/album/soundtrack]", "Remastered", "Radio Edit", "Extended Version", "feat.", etc.
+- Example: "Chim Chim Cher-ee - From Mary Poppins Soundtrack Version" → "Chim Chim Cher-ee"
 
-Keep ONLY:
-- The main piece name (Swan Lake, The Nutcracker, Moonlight Sonata)
-- Recognizable subtitles (Waltz of the Flowers, Ode to Joy)
+For CLASSICAL MUSIC (has opus numbers, movements, tempo markings, catalog numbers):
+- Remove: Opus numbers (Op. 71), Movement numbers (I., II., No. 13), Tempo markings (Allegro, Andante, etc.)
+- Remove: Catalog numbers (BWV 565, K. 331, D. 960), Key signatures (in E Major, in D Minor)
+- Remove: Act/Scene numbers, Remaster/Version notes
+- Keep: Main piece name and recognizable subtitles
+- Example: "Swan Lake, Op. 20, Act II: No. 13e, Danse des cygnes" → "Swan Lake: Danse des cygnes"
 
-Shorten composer names:
-- 'Pyotr Ilyich Tchaikovsky' → 'Pyotr Tchaikovsky'
-- 'Johann Sebastian Bach' → 'Johann Bach'
-- 'Ludwig van Beethoven' → 'Ludwig van Beethoven'
-- 'Wolfgang Amadeus Mozart' → 'Wolfgang Mozart'
+For COMPOSER names:
+- Shorten middle names: "Pyotr Ilyich Tchaikovsky" → "Pyotr Tchaikovsky"
+- "Johann Sebastian Bach" → "Johann Bach", "Wolfgang Amadeus Mozart" → "Wolfgang Mozart"
 
 Respond with ONLY the simplified title and artist, formatted as: Title by Artist
 No quotes, no extra text, no explanations."""
