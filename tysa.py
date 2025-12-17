@@ -187,10 +187,10 @@ Keep ONLY:
 - Recognizable subtitles (Waltz of the Flowers, Ode to Joy)
 
 Shorten composer names:
-- 'Pyotr Ilyich Tchaikovsky' → 'Tchaikovsky'
-- 'Johann Sebastian Bach' → 'Bach'
-- 'Ludwig van Beethoven' → 'Beethoven'
-- 'Wolfgang Amadeus Mozart' → 'Mozart'
+- 'Pyotr Ilyich Tchaikovsky' → 'Pyotr Tchaikovsky'
+- 'Johann Sebastian Bach' → 'Johann Bach'
+- 'Ludwig van Beethoven' → 'Ludwig van Beethoven'
+- 'Wolfgang Amadeus Mozart' → 'Wolfgang Mozart'
 
 Respond with ONLY the simplified title and artist, formatted as: Title by Artist
 No quotes, no extra text, no explanations."""
