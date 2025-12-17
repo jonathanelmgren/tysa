@@ -96,7 +96,3 @@ macOS, Python 3.8+, Spotify Desktop, ElevenLabs API key, OpenAI API key (optiona
 ## License
 
 MIT
-
----
-
-Made with way too much classical music. 🎻
