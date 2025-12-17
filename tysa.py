@@ -193,13 +193,23 @@ BASE LANGUAGE: {self.language_code}
 
 Your job:
 1. Simplify the song title and artist name (remove metadata, opus numbers, remaster notes, etc.)
-2. Detect the primary language of the song/artist
-3. Generate the complete announcement string
+2. Detect the primary language of the SIMPLIFIED song title and artist
+3. Generate the complete announcement string with correct language brackets
 
 SIMPLIFICATION RULES:
 - For NORMAL SONGS: Keep FULL title ("Prepare for Landing" stays "Prepare for Landing")
 - Remove ONLY metadata: "from [album]", "Remastered", "Radio Edit", "feat.", etc.
-- For CLASSICAL: Remove opus numbers, movements, tempo markings, catalog numbers, key signatures
+
+- For CLASSICAL MUSIC: Aggressively simplify!
+  - Remove: ALL opus numbers (Op. 71, BWV 565, K. 331, RV 409, D. 960, Hob., etc.)
+  - Remove: ALL movement numbers (I., II., III., IV., No. 13, etc.)
+  - Remove: ALL tempo markings (Allegro, Andante, Moderato, Presto, Adagio, etc.)
+  - Remove: ALL key signatures (in E Minor, in D Major, in B-flat, etc.)
+  - Remove: Movement descriptions after colons
+  - Keep: Only the main work title
+  - Example: "Cello Concerto in E Minor, RV 409: II. Allegro" → "Cello Concerto"
+  - Example: "Symphony No. 9 in D Minor, Op. 125: IV. Presto" → "Symphony No. 9"
+
 - Shorten composer names: "Johann Sebastian Bach" → "Johann Bach"
 
 ANNOUNCEMENT FORMAT:
@@ -215,12 +225,13 @@ If MODE is SMART:
 If MODE is WIZARD:
 - Uses eleven_v3 which supports brackets
 - Translate "Now playing" and "by" to the BASE LANGUAGE
-- Use [read in XX] brackets for song/artist in their native language
+- Detect language of SIMPLIFIED title/artist, then use [read in XX] brackets
 - Use [read in BASE] to switch back to base language between song and artist
 - Add " - " before AND after "by"
-- Format: "[translated 'Now playing']: [read in XX][song] [read in BASE] - [translated 'by'] - [read in XX][artist]"
-- Example (BASE=sv, song in English): "Nu spelas: [read in en]Gaia [read in sv] - av - [read in en]Oliver Ólafsson"
-- Example (BASE=en, song in Swedish): "Now playing: [read in sv]Alla vill ju vara som du [read in en] - by - [read in sv]Nanne Grönvall"
+- Format: "[translated 'Now playing']: [read in XX][simplified_song] [read in BASE] - [translated 'by'] - [read in XX][artist]"
+- Example (BASE=sv, English song): "Nu spelas: [read in en]Gaia [read in sv] - av - [read in en]Oliver Ólafsson"
+- Example (BASE=sv, Classical): "Nu spelas: [read in en]Cello Concerto [read in sv] - av - [read in it]Antonio Vivaldi"
+- Example (BASE=en, Swedish song): "Now playing: [read in sv]Alla vill ju vara som du [read in en] - by - [read in sv]Nanne Grönvall"
 
 Respond with ONLY the announcement string. No explanations."""
 
