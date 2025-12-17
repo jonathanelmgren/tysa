@@ -20,7 +20,7 @@ Yes, I know this completely outs me as someone who listens to classical music. A
 
 **Silent Mode:** Logs to file only unless you set DEBUG=true. Keep the booth clean.
 
-## 🚀 Quick Start (Spinning Up)
+## 🚀 Spinning Up (pun intended)
 
 ### Installation
 
