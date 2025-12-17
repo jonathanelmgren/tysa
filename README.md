@@ -6,6 +6,8 @@ TYSA is your digital radio DJ. A Python script that detects your current Spotify
 
 Yes, I know this completely outs me as someone who listens to classical music. And yes, that's exactly why GPT simplification exists - because nobody wants to hear "Symphony No. 9 in D Minor, Op. 125 'Choral': IV. Presto - Allegro assai" when you can just say "Ode to Joy." 🎻
 
+(Note: This is for macOS with Spotify Desktop only (4now))
+
 ## 🎙️ The Origin Story
 
 Spotify Wrapped told me I'm in the top 1% of listeners with 100,000 minutes streamed. Impressive, right? Plot twist: play me my top song and I can barely tell you the name or artist. Turns out you can listen to thousands of hours of music and learn absolutely nothing if you're not paying attention.
