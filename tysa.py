@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-handlers = [logging.FileHandler('tysa.log')]
+handlers: list[logging.Handler] = [logging.FileHandler('tysa.log')]
 if os.getenv('DEBUG', 'false').lower() == 'true':
     handlers.append(logging.StreamHandler(sys.stdout))
 
@@ -39,30 +39,42 @@ class SpotifyAnnouncer:
         load_dotenv()
         self._validate_env_vars()
 
-        self.enable_gpt = os.getenv('ENABLE_GPT_SIMPLIFICATION', 'true').lower() == 'true'
-        self.voice_id = os.getenv('ELEVENLABS_VOICE_ID', 'cjVigY5qzO86Huf0OWal')
+        self.mode = os.getenv('MODE', 'smart').lower()
+        if self.mode not in ['basic', 'smart', 'wizard']:
+            logger.warning(f"Invalid MODE '{self.mode}', defaulting to 'smart'")
+            self.mode = 'smart'
+
+        self.voice_id = os.getenv('ELEVENLABS_VOICE_ID', 'RexqLjNzkCjWogguKyff')
+        self.language_code = os.getenv('LANGUAGE_CODE', 'en')
+        self.now_playing_text = os.getenv('NOW_PLAYING_TEXT', 'Now playing')
+        self.by_text = os.getenv('BY_TEXT', 'by')
         self.model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
         self.output_dir = os.getenv('OUTPUT_DIR', 'output')
         self.poll_interval = int(os.getenv('POLL_INTERVAL_SECONDS', '1'))
         self.gpt_cache_file = os.getenv('GPT_CACHE_FILE', '.gpt_cache.json')
         self.volume = float(os.getenv('PLAYBACK_VOLUME', '0.5'))
 
-        self.openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY')) if self.enable_gpt else None
+        # OpenAI only required for smart/wizard modes
+        if self.mode in ['smart', 'wizard']:
+            self.openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        else:
+            self.openai_client = None
+
         self.elevenlabs_client = ElevenLabs(api_key=os.getenv('ELEVENLABS_API_KEY'))
 
         os.makedirs(self.output_dir, exist_ok=True)
 
         self.last_track = None
-        self.gpt_cache: Dict[str, Dict[str, str]] = self._load_gpt_cache()
+        self.gpt_cache: Dict[str, str] = self._load_gpt_cache()
 
         logger.info("TYSA initialized successfully")
 
-    def _load_gpt_cache(self) -> Dict[str, Dict[str, str]]:
+    def _load_gpt_cache(self) -> Dict[str, str]:
         """
-        Load GPT simplification cache from JSON file
+        Load GPT announcement cache from JSON file
 
         Returns:
-            Dictionary mapping raw track info to simplified versions
+            Dictionary mapping cache keys to announcement strings
         """
         if not os.path.exists(self.gpt_cache_file):
             logger.info("No GPT cache file found, starting with empty cache")
@@ -78,7 +90,7 @@ class SpotifyAnnouncer:
             return {}
 
     def _save_gpt_cache(self):
-        """Save GPT simplification cache to JSON file"""
+        """Save GPT announcement cache to JSON file"""
         try:
             with open(self.gpt_cache_file, 'w', encoding='utf-8') as f:
                 json.dump(self.gpt_cache, f, indent=2, ensure_ascii=False)
@@ -90,8 +102,9 @@ class SpotifyAnnouncer:
         """Validate required environment variables"""
         required_vars = ['ELEVENLABS_API_KEY']
 
-        enable_gpt = os.getenv('ENABLE_GPT_SIMPLIFICATION', 'true').lower() == 'true'
-        if enable_gpt:
+        # OpenAI only required for smart/wizard modes
+        mode = os.getenv('MODE', 'smart').lower()
+        if mode in ['smart', 'wizard']:
             required_vars.append('OPENAI_API_KEY')
 
         missing_vars = [var for var in required_vars if not os.getenv(var)]
@@ -146,51 +159,71 @@ class SpotifyAnnouncer:
 
         return None
 
-    def simplify_title_with_gpt(self, song: str, artist: str) -> Tuple[str, str]:
+    def generate_announcement(self, song: str, artist: str) -> str:
         """
-        Use GPT to simplify song titles for spoken announcements
-        Uses cache to avoid redundant API calls
-        If GPT is disabled, returns the original song and artist
+        Generate complete announcement string based on mode
+        Uses cache to avoid redundant API calls for smart/wizard modes
 
         Args:
             song: Original song title
             artist: Original artist name
 
         Returns:
-            Tuple of (simplified_song, simplified_artist)
+            Complete announcement string ready for TTS
         """
-        if not self.enable_gpt or not self.openai_client:
-            logger.debug("GPT simplification disabled, using original title")
-            return song, artist
+        # BASIC MODE: No GPT, use user-provided strings
+        if self.mode == 'basic':
+            return f"{self.now_playing_text}: {song} - {self.by_text} - {artist}"
 
-        cache_key = f"{song}|{artist}"
+        # SMART/WIZARD MODE: Use GPT
+        if not self.openai_client:
+            logger.error("OpenAI client not initialized for smart/wizard mode")
+            return f"Now playing: {song} - by - {artist}"
+
+        cache_key = f"{song}|{artist}|{self.language_code}|{self.mode}"
         if cache_key in self.gpt_cache:
-            cached = self.gpt_cache[cache_key]
-            logger.info(f"Using cached GPT simplification: {song} by {artist} → {cached['song']} by {cached['artist']}")
-            return cached['song'], cached['artist']
+            cached_announcement = self.gpt_cache[cache_key]
+            logger.info(f"Using cached announcement: {cached_announcement}")
+            return cached_announcement
 
-        system_prompt = """You simplify song titles for a spoken radio announcement.
+        system_prompt = f"""You are a radio announcer generating announcement text for text-to-speech.
 
-For NORMAL SONGS (pop, rock, jazz, etc.):
-- Keep the FULL title exactly as is, including all words
-- Examples: "Prepare for Landing" stays "Prepare for Landing", "Resounding Hymn" stays "Resounding Hymn"
-- "En whoppsi-doppsi, lopp-di-loppsi, alli-hoppsi-studs" stays fully intact
-- ONLY remove metadata: "from [movie/album/soundtrack]", "Remastered", "Radio Edit", "Extended Version", "feat.", etc.
-- Example: "Chim Chim Cher-ee - From Mary Poppins Soundtrack Version" → "Chim Chim Cher-ee"
+MODE: {self.mode.upper()}
+BASE LANGUAGE: {self.language_code}
 
-For CLASSICAL MUSIC (has opus numbers, movements, tempo markings, catalog numbers):
-- Remove: Opus numbers (Op. 71), Movement numbers (I., II., No. 13), Tempo markings (Allegro, Andante, etc.)
-- Remove: Catalog numbers (BWV 565, K. 331, D. 960), Key signatures (in E Major, in D Minor)
-- Remove: Act/Scene numbers, Remaster/Version notes
-- Keep: Main piece name and recognizable subtitles
-- Example: "Swan Lake, Op. 20, Act II: No. 13e, Danse des cygnes" → "Swan Lake: Danse des cygnes"
+Your job:
+1. Simplify the song title and artist name (remove metadata, opus numbers, remaster notes, etc.)
+2. Detect the primary language of the song/artist
+3. Generate the complete announcement string
 
-For COMPOSER names:
-- Shorten middle names: "Pyotr Ilyich Tchaikovsky" → "Pyotr Tchaikovsky"
-- "Johann Sebastian Bach" → "Johann Bach", "Wolfgang Amadeus Mozart" → "Wolfgang Mozart"
+SIMPLIFICATION RULES:
+- For NORMAL SONGS: Keep FULL title ("Prepare for Landing" stays "Prepare for Landing")
+- Remove ONLY metadata: "from [album]", "Remastered", "Radio Edit", "feat.", etc.
+- For CLASSICAL: Remove opus numbers, movements, tempo markings, catalog numbers, key signatures
+- Shorten composer names: "Johann Sebastian Bach" → "Johann Bach"
 
-Respond with ONLY the simplified title and artist, formatted as: Title by Artist
-No quotes, no extra text, no explanations."""
+ANNOUNCEMENT FORMAT:
+
+If MODE is SMART:
+- Uses eleven_flash_v2_5 which does NOT support brackets
+- Translate "Now playing" and "by" to the BASE LANGUAGE
+- NO BRACKETS AT ALL - just plain text
+- Format: "[translated 'Now playing']: [song] - [translated 'by'] - [artist]"
+- Example (BASE=sv): "Nu spelas: Bohemian Rhapsody - av - Queen"
+- Example (BASE=en): "Now playing: Hakuna Matata - by - Johan Halldén"
+
+If MODE is WIZARD:
+- Uses eleven_v3 which supports brackets
+- Start with DJ instruction: "[You are an upbeat radio DJ briefly announcing songs with the artist name before they play] "
+- Translate "Now playing" and "by" to the BASE LANGUAGE
+- Use [read in XX] brackets for song/artist in their native language
+- Use [read in BASE] to switch back to base language between song and artist
+- IMPORTANT: Add " - " before AND after "by"
+- Format: "[DJ instruction] [translated 'Now playing']: [read in XX][song] [read in BASE] - [translated 'by'] - [read in XX][artist]"
+- Example (BASE=sv, song in English): "[You are an upbeat radio DJ briefly announcing songs with the artist name before they play] Nu spelas: [read in en]Gaia [read in sv] - av - [read in en]Oliver Ólafsson"
+- Example (BASE=en, song in Swedish): "[You are an upbeat radio DJ briefly announcing songs with the artist name before they play] Now playing: [read in sv]Alla vill ju vara som du [read in en] - by - [read in sv]Nanne Grönvall"
+
+Respond with ONLY the announcement string. No explanations."""
 
         try:
             response = self.openai_client.chat.completions.create(
@@ -199,32 +232,28 @@ No quotes, no extra text, no explanations."""
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"{song} by {artist}"}
                 ],
-                max_tokens=100,
+                max_tokens=150,
                 temperature=0
             )
 
-            result = response.choices[0].message.content.strip()
-            logger.info(f"GPT simplification: {song} by {artist} → {result}")
+            content = response.choices[0].message.content
+            if not content:
+                logger.error("GPT returned empty content")
+                return f"Now playing: {song} - by - {artist}"
 
-            if " by " in result:
-                simplified_song, simplified_artist = result.rsplit(" by ", 1)
-                simplified_song = simplified_song.strip()
-                simplified_artist = simplified_artist.strip()
-            else:
-                simplified_song = result
-                simplified_artist = artist
+            announcement = content.strip()
+            logger.info(f"GPT generated announcement: {announcement}")
 
-            self.gpt_cache[cache_key] = {
-                'song': simplified_song,
-                'artist': simplified_artist
-            }
+            # Cache the announcement
+            self.gpt_cache[cache_key] = announcement
             self._save_gpt_cache()
 
-            return simplified_song, simplified_artist
+            return announcement
 
         except Exception as e:
-            logger.error(f"GPT simplification failed: {e}")
-            return song, artist
+            logger.error(f"GPT announcement generation failed: {e}")
+            # Fallback: simple announcement in base language
+            return f"Now playing: {song} - by - {artist}"
 
     def _play_audio(self, file_path: str) -> bool:
         """Play audio file using macOS afplay command"""
@@ -247,13 +276,15 @@ No quotes, no extra text, no explanations."""
             logger.error(f"Unexpected error playing audio: {e}")
             return False
 
-    def generate_speech(self, text: str, output_filename: str) -> Optional[str]:
+    def generate_speech(self, text: str, output_filename: str, language_code: str, model_id: str) -> Optional[str]:
         """
         Generate speech using ElevenLabs
 
         Args:
             text: Text to convert to speech
             output_filename: Filename for the output audio
+            language_code: Language code for TTS (ISO 639-1)
+            model_id: ElevenLabs model ID to use
 
         Returns:
             Path to the generated audio file or None on failure
@@ -264,8 +295,9 @@ No quotes, no extra text, no explanations."""
             audio = self.elevenlabs_client.text_to_speech.convert(
                 text=text,
                 voice_id=self.voice_id,
-                model_id="eleven_multilingual_v2",
-                output_format="mp3_44100_128"
+                model_id=model_id,
+                output_format="mp3_44100_128",
+                language_code=language_code
             )
 
             audio_data = b''.join(chunk for chunk in audio)
@@ -305,13 +337,20 @@ No quotes, no extra text, no explanations."""
 
         self.last_track = track_identifier
 
-        simplified_song, simplified_artist = self.simplify_title_with_gpt(song, artist)
-        announcement = f"Now playing: {simplified_song} - by {simplified_artist}"
-        logger.info(f"Announcement: {announcement}")
+        # Generate complete announcement based on mode
+        announcement = self.generate_announcement(song, artist)
+        logger.info(f"Announcement ({self.mode}): {announcement}")
 
-        safe_artist = self._sanitize_filename(simplified_artist)
-        safe_title = self._sanitize_filename(simplified_song)
-        filename = f"{safe_artist}_{safe_title}.mp3"
+        # Determine model based on mode
+        if self.mode == 'wizard':
+            model_id = "eleven_v3"
+        else:
+            model_id = "eleven_flash_v2_5"
+
+        # Create filename: mode_language_artist_song.mp3
+        safe_artist = self._sanitize_filename(artist)
+        safe_title = self._sanitize_filename(song)
+        filename = f"{self.mode}_{self.language_code}_{safe_artist}_{safe_title}.mp3"
         file_path = os.path.join(self.output_dir, filename)
 
         if os.path.exists(file_path):
@@ -319,10 +358,10 @@ No quotes, no extra text, no explanations."""
             self._play_audio(file_path)
             return True
 
-        audio_path = self.generate_speech(announcement, filename)
+        audio_path = self.generate_speech(announcement, filename, self.language_code, model_id)
 
         if audio_path:
-            logger.info(f"Successfully processed track: {simplified_song} by {simplified_artist}")
+            logger.info(f"Successfully processed track: {song} by {artist}")
             self._play_audio(audio_path)
             return True
 

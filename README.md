@@ -16,11 +16,11 @@ So I figured, what if I learned unconsciously? If someone announced the song and
 
 ## Features
 
-- GPT-4o-mini simplifies complex classical titles
-- ElevenLabs TTS for natural voice announcements
-- Caches everything—replays cost $0
-- Uses AppleScript (no Spotify OAuth needed)
-- Polls every second for instant detection
+- GPT-4o-mini simplifies complex classical titles and detects song language
+- Multilingual support with automatic language detection
+- ElevenLabs TTS for natural voice announcements (v3 or flash_v2_5)
+- Localized broadcasts: seamlessly switch between languages mid-announcement
+- Caches everything - replays cost $0
 
 ## Setup
 
@@ -31,8 +31,8 @@ cp .env.example .env
 ```
 
 Add your API keys to `.env`:
-- ElevenLabs: https://elevenlabs.io/
-- OpenAI (optional): https://platform.openai.com/api-keys
+- ElevenLabs: https://elevenlabs.io/ (required)
+- OpenAI: https://platform.openai.com/api-keys (only for smart/wizard mode)
 
 Run it:
 ```bash
@@ -46,23 +46,49 @@ Stop with `Ctrl+C` or `pkill -f tysa.py`
 | Variable | Default | What It Does |
 |----------|---------|--------------|
 | `ELEVENLABS_API_KEY` | *required* | Your ElevenLabs API key |
-| `ELEVENLABS_VOICE_ID` | `cjVigY5qzO86Huf0OWal` | Voice ID (default: Eric) |
-| `OPENAI_API_KEY` | *optional* | Only needed if GPT simplification is on |
+| `ELEVENLABS_VOICE_ID` | `RexqLjNzkCjWogguKyff` | Voice ID (default: Bradley). Pick a multilingual voice! |
+| `OPENAI_API_KEY` | *smart/wizard only* | Your OpenAI API key (not needed for basic mode) |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Model for title simplification |
+| `MODE` | `smart` | Announcement mode: `basic`, `smart`, or `wizard` |
+| `LANGUAGE_CODE` | `en` | Base language (en, sv, de, fr, etc.). Match to your voice! |
+| `NOW_PLAYING_TEXT` | `Now playing` | Custom "Now playing" text (basic mode only) |
+| `BY_TEXT` | `by` | Custom "by" text (basic mode only) |
 | `PLAYBACK_VOLUME` | `0.5` | Volume (0.0=silent, 1.0=max) |
 | `POLL_INTERVAL_SECONDS` | `1` | How often to check for track changes |
-| `ENABLE_GPT_SIMPLIFICATION` | `true` | Simplify classical titles? |
 | `DEBUG` | `false` | Log to terminal (true) or file only (false) |
 | `OUTPUT_DIR` | `output` | Where to save generated MP3s |
 | `RUN_MODE` | `continuous` | `continuous` or `once` |
 
+### Modes 🎚️
+
+**Basic Mode** (`MODE=basic`):
+- No GPT, no OpenAI API key needed
+- Fastest & cheapest
+- User provides announcement strings
+- Example: Set `NOW_PLAYING_TEXT=Nu spelas` and `BY_TEXT=av` → "Nu spelas: Bohemian Rhapsody - av - Queen"
+
+**Smart Mode** (`MODE=smart`):
+- GPT translates & simplifies titles
+- Uses `eleven_flash_v2_5`
+- Entire announcement in base language
+- Example (LANGUAGE_CODE=sv): "Nu spelas: Bohemian Rhapsody - av - Queen"
+
+**Wizard Mode** 🧙‍♂️ (`MODE=wizard`):
+- GPT + multilingual inline switching
+- Uses `eleven_v3` with brackets
+- Songs pronounced in native language
+- Example (LANGUAGE_CODE=sv): "Nu spelas: [English]Gaia [Swedish] - av - [English]Oliver Ólafsson"
+
 ## How It Works
 
 1. AppleScript polls Spotify for track changes
-2. GPT simplifies titles (strips opus numbers, movements, key signatures)
-3. ElevenLabs generates the announcement
+2. Announcement generated based on mode:
+   - **Basic**: Direct string substitution (Cheapest and fastest)
+   - **Smart**: GPT simplifies & translates
+   - **Wizard**: GPT + multilingual formatting
+3. ElevenLabs converts to speech (flash_v2_5 or v3)
 4. Audio plays via `afplay`
-5. Everything caches for next time
+5. Everything caches for instant replays
 
 Generated files go to `output/` like `Beethoven_Moonlight_Sonata.mp3`
 
@@ -70,7 +96,7 @@ Generated files go to `output/` like `Beethoven_Moonlight_Sonata.mp3`
 
 **"Nothing is currently playing"** - Spotify must be running and playing
 
-**"Missing required environment variables"** - Check `.env` has `ELEVENLABS_API_KEY`
+**"Missing required environment variables"** - Check `.env` has `ELEVENLABS_API_KEY` (and `OPENAI_API_KEY` if using smart/wizard mode)
 
 **Permission errors** - System Preferences → Privacy & Security → Automation, grant terminal access to Spotify
 
@@ -93,7 +119,7 @@ python tysa.py
 
 ## Requirements
 
-macOS, Python 3.8+, Spotify Desktop, ElevenLabs API key, OpenAI API key (optional)
+macOS, Python 3.8+, Spotify Desktop, ElevenLabs API key, OpenAI API key (smart/wizard mode only)
 
 ## License
 
