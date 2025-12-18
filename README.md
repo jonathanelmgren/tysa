@@ -35,32 +35,12 @@ So I figured, what if I learned unconsciously? If someone announced the song and
 **Paid tier ($5/month):**
 - Flash: 60,000 chars = 1,333 songs
 - v3: 30,000 chars = 333 songs
-
-**Cost per unique song (after free tier):**
-- **Basic**: ~$0.004 (ElevenLabs flash only)
-- **Smart**: ~$0.0041 (flash + GPT ~$0.0001)
-- **Wizard**: ~$0.015 (v3 + GPT) - **3.5x more** due to brackets
-
+  
 **Replays: $0** - Everything is cached!
-
-For 1,000 unique songs in smart mode: ~$4 total. After that, your entire library is cached forever.
 
 ### How Long Can I Listen?
 
 **10 hours/day = ~171 songs** (assuming 3.5 min/song)
-
-**Variety listener (all new songs):**
-- Free tier basic/smart: **2.6 days**
-- Free tier wizard: **14 hours**
-- Paid ($5/month) basic/smart: **7.8 days**
-- Paid ($5/month) wizard: **1.9 days**
-
-**Playlist listener (500-song library):**
-- First pass: Uses free tier + some paid
-- **Every replay after: FREE FOREVER** ✨
-- Listen 10 hours/day, every day, indefinitely at $0
-
-The cache makes this incredibly cost-effective for regular listening habits!
 
 ## Setup
 
@@ -79,7 +59,7 @@ Run it:
 ./run.sh
 ```
 
-Stop with `Ctrl+C` or `pkill -f tysa.py`
+Stop with `Ctrl+C` or `pkill -f tysa.py` or use your own terminal multiplexer
 
 ## Configuration
 
@@ -124,8 +104,8 @@ Stop with `Ctrl+C` or `pkill -f tysa.py`
 1. AppleScript polls Spotify for track changes
 2. Announcement generated based on mode:
    - **Basic**: Direct string substitution (Cheapest and fastest)
-   - **Smart**: GPT simplifies & translates
-   - **Wizard**: GPT + multilingual formatting
+   - **Smart**: GPT simplifies & translates (For my classical friends)
+   - **Wizard**: GPT + multilingual formatting (Reads songs and artists in their native language)
 3. ElevenLabs converts to speech (flash_v2_5 or v3)
 4. Audio plays via `afplay`
 5. Everything caches for instant replays
